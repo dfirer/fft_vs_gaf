@@ -32,7 +32,7 @@ if PREPROCESS_MODE == 0:
     num_test_samples = len(os.listdir("spec_imgs/test/cats")) + len(os.listdir("spec_imgs/test/dogs"))
 
     n_epochs = 100
-    learning_rate = 1e-4
+    learning_rate = 1e-3 #1e-4
     n_filters = [16, 32, 64]
 
 else:
@@ -67,14 +67,14 @@ training_set = train_datagen.flow_from_directory(
         train_path,
         target_size=(width, height),
         batch_size=15,
-        class_mode='binary',
+        class_mode='categorical',
         shuffle = False)
 
 testing_set = test_datagen.flow_from_directory(
         test_path,
         target_size=(width, height),
         batch_size=batch_size_test,
-        class_mode='binary',
+        class_mode='categorical',
         shuffle = False)
 
 
@@ -84,10 +84,11 @@ testing_set = test_datagen.flow_from_directory(
 class PredictionCallback(tf.keras.callbacks.Callback):    
   def on_epoch_end(self, epoch, logs={}):
       if epoch % 10 == 0:
-        pred = self.model.predict_generator(testing_set, steps=num_test_samples).flatten()
-        classes = [(1 if (x > 0.5) else 0) for x in pred]
+        testing_set.reset()
+        pred = self.model.predict_generator(testing_set, steps=num_test_samples) #.flatten()
+        classes = np.argmax(pred, axis=1)#[(1 if (x > 0.5) else 0) for x in pred]
         for i in range(len(classes)):
-            print('value: {:.4f}\tclass: {}'.format(pred[i], classes[i]))
+            print('value: {:.4f}\t{:.4f}\tclass: {}'.format(pred[i][0], pred[i][1], classes[i]))
     
 
 
@@ -129,8 +130,8 @@ model.add(Activation('relu'))
 model.add(Dropout(rate=0.5))
 
 # Output layer
-model.add(Dense(1))
-model.add(Activation('sigmoid'))
+model.add(Dense(2))
+model.add(Activation('softmax'))
 
 
 model.compile(loss="binary_crossentropy", optimizer=SGD(learning_rate=learning_rate), metrics=['accuracy'])
@@ -160,7 +161,7 @@ print(model.evaluate(x=training_set))
 
 testing_set.reset()
 pred = model.predict(testing_set, steps=num_test_samples, verbose=1)
-predicted_class_indices = [(1 if (x > 0.5) else 0) for x in pred.flatten()]
+predicted_class_indices = np.argmax(pred, axis=1)#[(1 if (x > 0.5) else 0) for x in pred.flatten()]
 labels = (training_set.class_indices)
 labels = dict((v,k) for k,v in labels.items())
 predictions = [labels[k] for k in predicted_class_indices]
